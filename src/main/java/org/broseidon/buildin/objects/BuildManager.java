@@ -45,7 +45,8 @@ public class BuildManager {
         BuildTask buildTask = new BuildTask(schematicName, chestBlock, pName, main);
         buildTask.setBuildTaskID(getMaxId() + 1);
 
-        buildTask.runTaskTimer(main, 40, 20 / config.getInt("Options.blocksPerSecond"));
+        int blocksPerSecond = Math.max(1, config.getInt("Options.blocksPerSecond"));
+        buildTask.runTaskTimer(main, 40, 20 / blocksPerSecond);
         tasks.add(buildTask);
         this.saveTask(buildTask);
 
@@ -120,7 +121,8 @@ public BuildTask startTask(String pName) throws IOException, DataException{
                         currentBuilds.getString(id + ".player"), main);
                 task.setPlace(currentBuilds.getInt(id + ".place"));
                 task.setBuildTaskID(Integer.parseInt(id));
-                task.runTaskTimer(main, 0, 20 / main.getConfig().getInt("Options.blocksPerSecond"));
+                int blocksPerSecond = Math.max(1, main.getConfig().getInt("Options.blocksPerSecond"));
+                task.runTaskTimer(main, 0, 20 / blocksPerSecond);
                 tasks.add(task);
                 return task;
             }

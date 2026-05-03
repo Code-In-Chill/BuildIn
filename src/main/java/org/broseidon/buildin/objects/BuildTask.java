@@ -1,8 +1,7 @@
 package org.broseidon.buildin.objects;
 
-import com.sk89q.worldedit.world.block.BaseBlock;
+import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.world.block.BlockState;
-import com.sk89q.worldedit.world.block.BlockType;
 import org.broseidon.buildin.main.BuildIn;
 import org.broseidon.buildin.main.BuildSchematic;
 import org.bukkit.*;
@@ -11,17 +10,16 @@ import org.bukkit.block.Chest;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
-public class BuildTask {
+public class BuildTask extends BukkitRunnable {
     private BuildSchematic schematic;
     private int place, sizeX, sizeY, sizeZ;
-    private BlockType[][][] blockArray;
-    private Player player;
+    private BlockState[][][] blockArray;
+    private UUID playerUUID;
     private FileConfiguration config;
 
     private BuildIn main;
@@ -33,10 +31,10 @@ public class BuildTask {
     private HashMap<Block, Material> originalBlockMaterials;
 
     int size;
-    HashMap<Block, BlockType> blocks;
+    HashMap<Block, BlockState> blocks;
 
-    public BuildTask(BuildSchematic schematicName, Block chestBlock, String pName, BuildIn main) {
-        this.schematic = schematicName;
+    public BuildTask(BuildSchematic schematic, Block chestBlock, String pName, BuildIn main) {
+        this.schematic = schematic;
         sizeX = schematic.sizeX;
         sizeY = schematic.sizeY;
         sizeZ = schematic.sizeZ;
@@ -52,7 +50,10 @@ public class BuildTask {
 
         blockArray = schematic.loadBlocks();
 
-        player = Bukkit.getServer().getPlayer(pName);
+        Player player = Bukkit.getServer().getPlayer(pName);
+        if (player != null) {
+            this.playerUUID = player.getUniqueId();
+        }
         this.main = main;
         buildTaskID = 0;
         config = main.getConfig();
@@ -71,30 +72,38 @@ public class BuildTask {
         for (int x = 0; x < sizeX; x++) {
             for (int y = 0; y < sizeY; y++) {
                 for (int z = 0; z < sizeZ; z++) {
-                    blocks.put(placementLocation.clone().add(x, y, z).getBlock(), blockArray[x][y][z]);
-                    originalBlocks.add(placementLocation.clone().add(x, y, z).getBlock());
-                    originalBlockMaterials.put(placementLocation.clone().add(x, y, z).getBlock(), placementLocation.clone().add(x, y, z).getBlock().getType());
+                    Block worldBlock = placementLocation.clone().add(x, y, z).getBlock();
+                    blocks.put(worldBlock, blockArray[x][y][z]);
+                    originalBlocks.add(worldBlock);
+                    originalBlockMaterials.put(worldBlock, worldBlock.getType());
                 }
             }
         }
         //Sort based on Y level for bottom-to-top placement
-        originalBlocks.sort((o1, o2) -> Double.compare(o1.getY(), o2.getY()));
+        originalBlocks.sort(Comparator.comparingDouble(o -> o.getLocation().getY()));
         place = 0;
         size = blocks.size();
     }
 
+    @Override
     public void run() {
         if (place < size) {
 
+            Player player = Bukkit.getPlayer(playerUUID);
             if (player == null || !player.isOnline()) {
                 main.getBuildManager().saveTask(this);
-                cancel();
+                this.cancel();
+                return;
             }
 
             //For each BaseBlock get the vector of the player and place the corresponding block
             Block block = originalBlocks.get(place);
-            BlockType base = blocks.get(block);
+            BlockState base = blocks.get(block);
 
+            if (base == null) {
+                place++;
+                return;
+            }
 
             //Disabled by default to make plugin backwards compatible
             if (config.getBoolean("Options.sound"))
@@ -102,8 +111,8 @@ public class BuildTask {
 
 
             if (config.getBoolean("Options.survival-mode")) {
-
-                ItemStack stack = new ItemStack(block.getType(), 1);
+                Material material = BukkitAdapter.adapt(base).getMaterial();
+                ItemStack stack = new ItemStack(material, 1);
                 boolean isIgnoredMaterial = IgnoredMaterial.isIgnoredMaterial(stack.getType());
 
                 if (!buildChest.containsRequirement(stack) && !isIgnoredMaterial) {
@@ -112,46 +121,45 @@ public class BuildTask {
                         buildChest.setName(newName);
                         buildChest.update();
                     }
-                } else if (isIgnoredMaterial) {
-                    buildChest.setName(ChatColor.GREEN + schematic.getName());
-                    buildChest.update();
-                    place++;
-                    block.setType(block.getType(), false);
-                    block.setBlockData(block.getBlockData(), false);
                 } else {
                     buildChest.setName(ChatColor.GREEN + schematic.getName());
-                    buildChest.removeItemStack(stack);
+                    if (!isIgnoredMaterial) {
+                        buildChest.removeItemStack(stack);
+                    }
                     buildChest.update();
                     place++;
-                    block.setType(block.getType(), false);
-                    block.setBlockData(block.getBlockData(), false);
+                    block.setBlockData(BukkitAdapter.adapt(base), false);
                 }
 
 
             } else {
                 place++;
-                block.setType(block.getType(), false);
-                block.setBlockData(block.getBlockData(), false);
+                block.setBlockData(BukkitAdapter.adapt(base), false);
             }
         } else {
-            player.sendMessage(ChatColor.GREEN + Lang.COMPLETE.toString());
+            Player player = Bukkit.getPlayer(playerUUID);
+            if (player != null) {
+                player.sendMessage(ChatColor.GREEN + Lang.COMPLETE.toString());
+            }
             main.getBuildManager().removeTask(this);
-
             this.cancel();
         }
     }
 
+    @Override
     public void cancel() {
+        super.cancel();
     }
 
     public boolean isPlayerTaskOwner(String playerName){
-        return playerName.equals(player.getName());
+        Player player = Bukkit.getPlayer(playerUUID);
+        return player != null && playerName.equals(player.getName());
     }
 
     public void clearBuild(){
         for(Block b: originalBlocks){
             Material mat = originalBlockMaterials.get(b);
-            b.getLocation().getBlock().setType(mat);
+            b.setType(mat);
         }
     }
 
@@ -161,8 +169,7 @@ public class BuildTask {
         //use original blocks list and return all items on the floor.
         List<ItemStack> currentItemStacks = new ArrayList<>();
         for(Block block: originalBlocks){
-            Block currentBlock = block.getLocation().getBlock();
-            ItemStack stack = new ItemStack(currentBlock.getType(), 1);
+            ItemStack stack = new ItemStack(block.getType(), 1);
             currentItemStacks.add(stack);
         }
         return currentItemStacks;
@@ -186,7 +193,8 @@ public class BuildTask {
     }
 
     public String getOwnerName() {
-        return player.getName();
+        Player player = Bukkit.getPlayer(playerUUID);
+        return player != null ? player.getName() : "Unknown";
     }
 
     public void setBuildTaskID(int buildTaskID){ this.buildTaskID = buildTaskID; }
@@ -195,7 +203,7 @@ public class BuildTask {
 
     public BuildChest getBuildChest(){return buildChest; }
 
-    public void runTaskTimer(BuildIn main, int i, int i1) {
-
+    public void runTaskTimer(BuildIn main, int delay, int period) {
+        this.runTaskTimer((Plugin) main, (long) delay, (long) period);
     }
 }

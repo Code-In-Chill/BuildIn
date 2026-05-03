@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI Build & Integration"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync with remote
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git pull --rebase origin main
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Auto Increase Version
+        run: |
+          chmod +x scripts/version-bump.sh
+          MSG=$(git log -1 --format=%B)
+          ./scripts/version-bump.sh "$MSG"
+          NEW_VER=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | tail -n 1)
+          git add pom.xml
+          git commit -m "chore: bump version to v$NEW_VER [skip ci]"
+          git push origin HEAD:main
+          git push origin HEAD:develop || echo "WARNING: Could not push to develop."
+
+      - name: Determine Version
+        id: version
+        run: |
+          POM_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | tail -n 1)
+          echo "tag=v${POM_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Build package
+        run: mvn -B -DskipTests package
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          artifacts: "target/BuildIn-*.jar"
+          allowUpdates: true
+          generateReleaseNotes: true
