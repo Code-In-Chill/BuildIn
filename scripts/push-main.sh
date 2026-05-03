@@ -12,7 +12,7 @@ git add .
 echo "Committing with message: '$COMMIT_MSG'..."
 git commit -m "$COMMIT_MSG" || echo "No changes to commit."
 
-echo "Pushing to origin main..."
-git push origin main
+echo "Pushing to origin master..."
+git push origin master
 
 echo "Done! 🎉"

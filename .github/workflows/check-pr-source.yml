@@ -3,7 +3,7 @@ name: Check PR source branch
 on:
   pull_request:
     branches:
-      - main
+      - master
 
 jobs:
   check-source:
@@ -20,7 +20,7 @@ jobs:
 
           if [ "${SOURCE_BRANCH}" != "${ALLOWED_BRANCH}" ]; then
             echo ""
-            echo "ERROR: Pull requests into 'main' must originate from '${ALLOWED_BRANCH}'."
+            echo "ERROR: Pull requests into 'master' must originate from '${ALLOWED_BRANCH}'."
             echo "       Received: '${SOURCE_BRANCH}'"
             exit 1
           fi
