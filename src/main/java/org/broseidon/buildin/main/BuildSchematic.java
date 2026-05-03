@@ -32,7 +32,7 @@ public class BuildSchematic {
 
     private CuboidRegion cc;
 
-    private BlockType[][][] blockArray;
+    private BlockState[][][] blockArray;
 
     public BuildSchematic(String schematicsName, BuildIn instance) {
         this.sName = schematicsName;
@@ -56,7 +56,7 @@ public class BuildSchematic {
         for (int x = 0; x < sizeX; x++) {
             for (int y = 0; y < sizeY; y++) {
                 for (int z = 0; z < sizeZ; z++) {
-                    p.sendBlockChange(placementLocation.clone().add(x, y, z), BukkitAdapter.adapt(blockArray[x][y][z]).createBlockData());
+                    p.sendBlockChange(placementLocation.clone().add(x, y, z), BukkitAdapter.adapt(blockArray[x][y][z]));
                 }
             }
         }
@@ -88,7 +88,7 @@ public class BuildSchematic {
             for (int y = 0; y < sizeY; y++) {
                 for (int z = 0; z < sizeZ; z++) {
                     //Ok I have a list of materials
-                    Material material = BukkitAdapter.adapt(blockArray[x][y][z]);
+                    Material material = BukkitAdapter.adapt(blockArray[x][y][z]).getMaterial();
                     System.out.println(material);
                     if (!IgnoredMaterial.isIgnoredMaterial(material))
                         matList.add(material.toString());
@@ -128,17 +128,17 @@ public class BuildSchematic {
         }
     }
 
-    public BlockType[][][] loadBlocks() {
+    public BlockState[][][] loadBlocks() {
         //If north blockface is null check which blockface isnt null and based on that rotate clipboard so that it isnt null
         //Reload sizes
         sizeX = clipboard.getRegion().getWidth();
         sizeY = clipboard.getRegion().getHeight();
         sizeZ = clipboard.getRegion().getLength();
-        BlockType[][][] blocks = new BlockType[sizeX][sizeY][sizeZ];
+        BlockState[][][] blocks = new BlockState[sizeX][sizeY][sizeZ];
         for (int x = 0; x < sizeX; x++) {
             for (int y = 0; y < sizeY; y++) {
                 for (int z = 0; z < sizeZ; z++) {
-                    blocks[x][y][z] = clipboard.getFullBlock(BlockVector3.at(x, y, z)).getBlockType();
+                    blocks[x][y][z] = clipboard.getFullBlock(BlockVector3.at(x, y, z)).toImmutableState();
                 }
             }
         }

@@ -123,7 +123,6 @@ public class BlockListener implements Listener {
             List<ItemStack> requirements = new ArrayList<>();
 
             if (config.getBoolean("Options.survival-mode")) {
-
                 if (meta.getLore().isEmpty() || meta.getLore() == null) {
                     p.sendMessage(ChatColor.RED + "This schematic has no block requirements!");
                 } else {
@@ -137,26 +136,24 @@ public class BlockListener implements Listener {
                     }
                     this.requirements = requirements;
                 }
+            }
 
-                    try {
-                        if (!rgManager.canPlayerPlace(p, buildSchematic, placementLocation)) {
-                            p.sendMessage(ChatColor.RED + Lang.BAD_PLACE.toString());
-                            return;
-                        }
-                    } catch (Exception ignored) {
-                        ignored.printStackTrace();
-                        return;
-                    }
-                    p.updateInventory();
-
-
-                    buildSchematic.preview(p, placementLocation);
-
-                    playerLocation = placementLocation;
-                    initConvo(p).begin();
-                    e.setCancelled(true);
-
+            try {
+                if (!rgManager.canPlayerPlace(p, buildSchematic, placementLocation)) {
+                    p.sendMessage(ChatColor.RED + Lang.BAD_PLACE.toString());
+                    return;
                 }
+            } catch (Exception ignored) {
+                ignored.printStackTrace();
+                return;
+            }
+            p.updateInventory();
+
+            buildSchematic.preview(p, placementLocation);
+
+            playerLocation = placementLocation;
+            initConvo(p).begin();
+            e.setCancelled(true);
         }
     }
 
